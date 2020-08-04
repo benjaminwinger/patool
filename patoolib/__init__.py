@@ -322,7 +322,7 @@ def check_archive_format (format, compression):
         raise util.PatoolError("unkonwn archive compression `%s'" % compression)
 
 
-def find_archive_program (format, command, program=None):
+def find_archive_program (format, command, program=None, compression=None):
     """Find suitable archive program for given format and mode."""
     commands = ArchivePrograms[format]
     programs = []
@@ -337,6 +337,9 @@ def find_archive_program (format, command, program=None):
         raise util.PatoolError("%s archive format `%s' is not supported" % (command, format))
     # return the first existing program
     for program in programs:
+        if compression is not None and not check_program_compression(command, program, compression):
+            continue
+
         if program.startswith('py_'):
             # it's a Python module and therefore always supported
             return program
@@ -382,7 +385,7 @@ def list_formats ():
                       (command, util.strlist_with_or(handlers)))
 
 
-def check_program_compression(archive, command, program, compression):
+def check_program_compression(command, program, compression):
     """Check if a program supports the given compression."""
     program = os.path.basename(program)
     if compression:
@@ -394,8 +397,9 @@ def check_program_compression(archive, command, program, compression):
                 comp_command = 'extract'
             comp_prog = find_archive_program(compression, comp_command)
             if not comp_prog:
-                msg = "cannot %s archive `%s': compression `%s' not supported"
-                raise util.PatoolError(msg % (command, archive, compression))
+                return False
+
+    return True
 
 
 def move_outdir_orphan (outdir):
@@ -470,8 +474,9 @@ def _extract_archive(archive, verbosity=0, interactive=True, outdir=None,
     if format is None:
         format, compression = get_archive_format(archive)
     check_archive_format(format, compression)
-    program = find_archive_program(format, 'extract', program=program)
-    check_program_compression(archive, 'extract', program, compression)
+    program = find_archive_program(
+        format, 'extract', program=program, compression=compression
+    )
     get_archive_cmdlist = get_archive_cmdlist_func(program, 'extract', format)
     if outdir is None:
         outdir = util.tmpdir(dir=".")
@@ -507,8 +512,9 @@ def _create_archive(archive, filenames, verbosity=0, interactive=True,
     if format is None:
         format, compression = get_archive_format(archive)
     check_archive_format(format, compression)
-    program = find_archive_program(format, 'create', program=program)
-    check_program_compression(archive, 'create', program, compression)
+    program = find_archive_program(
+        format, 'create', program=program, compression=compression
+    )
     get_archive_cmdlist = get_archive_cmdlist_func(program, 'create', format)
     origarchive = None
     if os.path.basename(program) == 'arc' and \
@@ -534,8 +540,9 @@ def _handle_archive(archive, command, verbosity=0, interactive=True,
     check_archive_format(format, compression)
     if command not in ('list', 'test'):
         raise util.PatoolError("invalid archive command `%s'" % command)
-    program = find_archive_program(format, command, program=program)
-    check_program_compression(archive, command, program, compression)
+    program = find_archive_program(
+        format, command, program=program, compression=compression
+    )
     get_archive_cmdlist = get_archive_cmdlist_func(program, command, format)
     # prepare keyword arguments for command list
     cmdlist = get_archive_cmdlist(archive, compression, program, verbosity, interactive)
