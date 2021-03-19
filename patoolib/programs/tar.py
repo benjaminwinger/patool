@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Archive commands for the GNU tar program."""
 import os
+import subprocess
 
 
 def extract_tar (archive, compression, cmd, verbosity, interactive, outdir):
@@ -41,6 +42,16 @@ def create_tar (archive, compression, cmd, verbosity, interactive, filenames):
     cmdlist.extend(filenames)
     return cmdlist
 
+def is_bsdtar (progname):
+    """
+    Determine if the executable is bsdtar, as opposed to GNU tar
+
+    On macOS, bsdtar is included as `tar`
+    """
+    cmd = [progname, "--version"]
+    output = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]
+    return "bsdtar" in output.decode()
+
 def add_tar_opts (cmdlist, compression, verbosity):
     """Add tar options to cmdlist."""
     progname = os.path.basename(cmdlist[0])
@@ -50,7 +61,7 @@ def add_tar_opts (cmdlist, compression, verbosity):
         cmdlist.append('-Z')
     elif compression == 'bzip2':
         cmdlist.append('-j')
-    elif compression in ('lzma', 'xz') and progname == 'bsdtar':
+    elif compression in ('lzma', 'xz') and is_bsdtar(progname):
         cmdlist.append('--%s' % compression)
     elif compression in ('lzma', 'xz', 'lzip'):
         # use the compression name as program name since
